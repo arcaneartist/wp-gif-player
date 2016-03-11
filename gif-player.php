@@ -28,7 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class WP_GIF_Player{
 
     private $options;
-
+	private $frame_quality_options;
+	
     //Constructor, adds all actions and filters
     function __construct(){
         add_action( 'init', array( $this, 'register_shortcodes') );
@@ -260,8 +261,26 @@ class WP_GIF_Player{
         //create a new file path by adding _still(.gif) to the current file path
         $new_still = preg_replace('/\.gif$/', '_still_tmp.jpeg', $img_url);
         $new_still_path = str_replace( home_url(), ABSPATH, $new_still); //hier kann auch ein Array übergeben werden
+		
+		// get the frame quality options
+		$this->frame_quality_options = get_option('set_extracted_frame_quality');
+		
+		// determine the quality
+		$frame_quality = 75; // the default imagejpeg quality 
+		if(isset($this->frame_quality_options['frame_quality'])) {
+			if($this->frame_quality_options['frame_quality'] === "0") {
+				$frame_quality = 65; // low
+			} else if($this->frame_quality_options['frame_quality'] === "1") {
+				$frame_quality = 75; // medium
+			} else if($this->frame_quality_options['frame_quality'] === "2") {
+				$frame_quality = 85; // high
+			} else if($this->frame_quality_options['frame_quality'] === "3") {
+				$frame_quality = 95; // very high
+			}
+		}
+		
         //Extract the first frame of the gif as a jpeg file and save it to the media library.
-        imagejpeg(imagecreatefromgif($img_url), $new_still_path);
+        imagejpeg(imagecreatefromgif($img_url), $new_still_path, $frame_quality);
 
         return $new_still_path; //return path to still first frame
     }
@@ -283,15 +302,19 @@ class WP_GIF_Player{
         }
         // Set class property
         $this->options = get_option( 'set_still_as_featured' );
-
-        echo '<div class="wrap">
-                <h2>' . _e('WP Gif Player Settings', 'WPGP' ). '</h2>
-                <form method="post" action="options.php"> ';
+		$this->frame_quality_options = get_option( 'set_extracted_frame_quality' );
+		
+        echo '<div class="wrap"><h1>';
+		echo _e('WP Gif Player Settings', 'WPGP' ); // NOTE: keep on it's own else it will be written before other echos in the same line
+		echo '</h1><form method="post" action="options.php">';
+		
         settings_fields( 'featured_still' );
+		settings_fields( 'frame_quality' );
+
         do_settings_sections( 'wp-gif-player-menu' );
         submit_button();
-        echo '</form>
-             </div>';
+		
+        echo '</form></div>';
     }
 
     /*
@@ -305,7 +328,7 @@ class WP_GIF_Player{
         add_settings_section(
             'featured_section', // ID
             __('Thumbnail Settings', 'WPGP'), // Title
-            array( $this, 'print_section_info' ), // Callback
+            array( $this, 'print_thumbnail_info' ), // Callback
             'wp-gif-player-menu' // Page
         );
 
@@ -316,52 +339,142 @@ class WP_GIF_Player{
             'wp-gif-player-menu', //settings page slug
             'featured_section'
         );
-
+		
+		// FRAME QUALITY
+		register_setting(	
+			'frame_quality',
+			'set_extracted_frame_quality'
+		);
+		
+		add_settings_section(
+			'frame_quality_section', // ID
+			__('Extracted Frame Quality', 'WPGP'), // Title
+			array($this, 'print_extract_quality_info' ), // Callback,
+			'wp-gif-player-menu' // Page
+		);
+		
+		add_settings_field(
+			'extract_frame_quality', // ID
+			__('Image Quality', 'WPGP'), // Title,
+			array($this, 'frame_quality_callback'), // Callback (prints quality options)
+			'wp-gif-player-menu', //settings page slug
+			'frame_quality_section'
+		);
     }
 
     /**
      * Print the Section text
      */
-    public function print_section_info()
+    public function print_thumbnail_info()
     {
         _e('Choose your settings below:', 'WPGP');
     }
 
+	public function print_extract_quality_info()
+	{
+		_e('Choose the extracted image settings below:', 'WPGP');
+	}
     /*
      * Callback for setting thumbnails automatically
      */
     function enable_featured_callback(){
+		$html = '<fieldset>';
+		
         //Radio button for no featured image ( = standard selection)
-        $html = '<input type="radio" id="featured_none_check" name="set_still_as_featured[featured_check]" value="0"';
+		$html .= '<label for="featured_still_check">';
+        $html .= '<input type="radio" id="featured_none_check" name="set_still_as_featured[featured_check]" value="0"';
         if($this->options == ""){
             $html .= 'checked />';
         }else if(isset( $this->options['featured_check']) && $this->options['featured_check'] === "0"){
             $html .= ' checked />';
         }
-        $html .= '<label for="featured_still_check">' . __('Don\'t set a post thumbnail', 'WPGP') . '</label>';
+        $html .= __('Don\'t set a post thumbnail', 'WPGP') . '</label><br>';
 
         //Radio button for still as featured
-        $html .= '<br><input type="radio" id="featured_still_check" name="set_still_as_featured[featured_check]" value="1"';
+		$html .= '<label for="featured_still_check">';
+        $html .= '<input type="radio" id="featured_still_check" name="set_still_as_featured[featured_check]" value="1"';
         if($this->options == ""){
             $html .= '/>';
         }else if(isset( $this->options['featured_check']) && $this->options['featured_check'] === "1"){
             $html .= ' checked />';
         }
-        $html .= '<label for="featured_still_check">' . __('Set first frame of first GIF as Thumbnail', 'WPGP') . '</label>';
+        $html .= __('Set first frame of first GIF as Thumbnail', 'WPGP') . '</label><br>';
 
         //Radio button for gif as featured
-        $html .= '<br><input type="radio" id="featured_gif_check" name="set_still_as_featured[featured_check]" value="2"';
+		$html .= '<label for="featured_still_check">';
+        $html .= '<input type="radio" id="featured_gif_check" name="set_still_as_featured[featured_check]" value="2"';
         if($this->options == ""){
             $html .= '/>';
         }else if(isset( $this->options['featured_check']) && $this->options['featured_check'] === "2"){
             $html .= ' checked />';
         }
-        $html .= '<label for="featured_gif_check">' . __('Set first GIF as Thumbnail', 'WPGP') . '</label>';
-
+        $html .= __('Set first GIF as Thumbnail', 'WPGP') . '</label><br>';
+		
+		$html .= '</fieldset>';
+		
+		//Quality settings for still frame
         echo $html;
     }
 
-
+	function frame_quality_callback() {
+		$html = '<fieldset>';
+		
+		// Radio for low quality
+		$html .= '<label for="extract_frame_quality">';
+		$html .= '<input type="radio" id="frame_quality_low" name="set_extracted_frame_quality[frame_quality]" value="0"';
+		if(	isset($this->frame_quality_options) 
+			&& isset($this->frame_quality_options['frame_quality']) 
+			&& $this->frame_quality_options['frame_quality'] === "0") 
+		{
+			$html .= ' checked />';
+		} else {
+			$html .= ' />';
+		}
+		$html .= __('Low', 'WPGP') . '</label><br>';
+		
+		// Radio for medium quality
+		$html .= '<label for="extract_frame_quality">';
+		$html .= '<input type="radio" id="frame_quality_medium" name="set_extracted_frame_quality[frame_quality]" value="1"';
+		if(	isset($this->frame_quality_options) 
+			&& isset($this->frame_quality_options['frame_quality']) 
+			&& $this->frame_quality_options['frame_quality'] === "1") 
+		{
+			$html .= ' checked />';
+		} else {
+			$html .= ' checked />';  // default if nothing defined
+		}
+		$html .= __('Medium', 'WPGP') . '</label><br>';
+		
+		// Radio for high quality
+		$html .= '<label for="extract_frame_quality">';
+		$html .= '<input type="radio" id="frame_quality_high" name="set_extracted_frame_quality[frame_quality]" value="2"';
+		if(	isset($this->frame_quality_options) 
+			&& isset($this->frame_quality_options['frame_quality']) 
+			&& $this->frame_quality_options['frame_quality'] === "2") 
+		{
+			$html .= ' checked />';
+		} else {
+			$html .= ' />';
+		}
+		$html .= __('High', 'WPGP') . '</label><br>';
+		
+		// Radio for Very high quality
+		$html .= '<label for="extract_frame_quality">';
+		$html .= '<input type="radio" id="frame_quality_veryhigh" name="set_extracted_frame_quality[frame_quality]" value="3"';
+		if(	isset($this->frame_quality_options) 
+			&& isset($this->frame_quality_options['frame_quality']) 
+			&& $this->frame_quality_options['frame_quality'] === "3") 
+		{
+			$html .= ' checked />';
+		} else {
+			$html .= ' />';
+		}
+		$html .= __('Very High', 'WPGP') . '</label><br>';
+		
+		$html .= '</fieldset>';
+		
+		echo $html;
+	}
 
     /************************************************************************************************************/
     /************************************************** UNUSED **************************************************/
