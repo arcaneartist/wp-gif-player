@@ -103,28 +103,45 @@ class WP_GIF_Player{
     function shortcodes($atts){
         extract(shortcode_atts(array(
             'gif_id' => '',
+			'align' => 'alignnone',
             'width' => '',
         ), $atts));
 
         if(is_numeric($width)){
-            $width = 'wpgp-width'.$width;
+            //$width = 'wpgp-width'.$width;
         }
 
         $output = '';
-        if($gif_id != null && !empty($gif_id) ){
+        if($gif_id != null && !empty($gif_id) ){		
+			//echo '<p>' . $caption .'</p>';
             if(get_post_mime_type($gif_id) === "image/gif"){
+
                 $gif_array = wp_get_attachment_image_src($gif_id, 'full');
                 $gif_attach = '';
                 if(is_array($gif_array)){
                     $gif_attach = $gif_array[0];
                 }
+				
+				// add captions?
+				$attachment = get_post($gif_id);
+				$caption = $attachment->post_excerpt;				
+				if(!empty($caption)) 
+				{
+					$cap_width = $gif_array[1] < $width ? $gif_array[1] : $width;
+					$output .= '<div id="attachment_' . $attachment->ID . '" class="wp-caption ' . $align . '" style="max-width:' . $cap_width .'px;">';
+				}
+				
                 $still_attach = preg_replace('/\.gif$/', '_still_tmp.jpeg', $gif_attach);
-                $output = '<div class="gif_wrap ' . $width . '">
-                        <span class="empty_span ' . $width . '"></span>
-                        <span class="play_gif ' . $width . '">GIF</span>
+                $output .= '<div class="gif_wrap" style="max-width:' . $width . 'px;">
+                        <span class="empty_span" style="max-width:' . $width . 'px;"></span>
+                        <span class="play_gif" style="max-width:' . $width . 'px;">GIF</span>
                         <img src="' . $still_attach . '" class="_showing frame no-lazy" />
-                   </div>
-                   <img src="' . $still_attach . '" class="_hidden no-lazy" alt="bla" style="display:none;" /><br>';
+                   	</div>
+                   	<img src="' . $still_attach . '" class="_hidden no-lazy" alt="' . get_the_title($gif_id). '" style="display:none;" />';
+				if(!empty($caption))
+				{
+					$output .= '<div class="wp-caption-text"><p>' . $caption . '</p></div></div>';
+				}
             }
         }else{
             $output = '<p>' . _e('Sorry, but we couldn\'t find a GIF with this ID!', 'WPGP') . '</p>';

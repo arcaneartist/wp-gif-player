@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 .gif_wrap {
     position: relative;
+	display: inline-block;
 }
 .empty_span {
     position: absolute;

@@ -34,7 +34,7 @@ jQuery(function($) {
                 var all_gifs = self.window.state().get('selection').toJSON();
                 $(all_gifs).each(function(){
                     if(this.mime === "image/gif"){
-                        wp.media.editor.insert('[WPGP gif_id="' + this.id + '" width="600"]\n');
+                        wp.media.editor.insert('[WPGP gif_id="' + this.id + '" width="600" align="aligncenter"]\n');
                     }else{
                         alert(unescape("Der hochgeladene Dateityp wird von WP Gif Player nicht unterst%FCtzt. Bitte laden Sie nur Dateien im .gif Format hoch%21%0A"));
                     }
